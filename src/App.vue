@@ -3,59 +3,31 @@
     <input type="file" ref="file" @change="loadFile" id="file">
     <div style="width: 600px;height: 400px;" ref="chart"></div>
     <div ref="table">
-      <table border="1" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+      <p>表格生成</p>
+      <label>
+        起始
+        <input type="number" v-model="start">
+      </label>
+      <label>
+        步进
+        <input type="number" v-model="step">
+      </label>
+      <label>
+        结束
+        <input type="number" v-model="end">
+      </label>
+      <button @click="generateTable">生成</button>
+      <table border="1" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top: 20px;">
         <tbody>
         <tr>
-          <td>Frequency(GHz)</td>
-          <td v-for="item in tableData.slice(0, 5)" :key="item[0]">
+          <td>频率(GHz)</td>
+          <td v-for="item in tableData" :key="item[0]">
             {{item[0]}}
           </td>
         </tr>
         <tr>
-          <td>{{dataName}}</td>
-          <td v-for="item in tableData.slice(0, 5)" :key="item[1]">
-            {{item[1]}}
-          </td>
-        </tr>
-
-        <tr>
-          <td>Frequency(GHz)</td>
-          <td v-for="item in tableData.slice(5, 10)" :key="item[0]">
-            {{item[0]}}
-          </td>
-        </tr>
-
-        <tr>
-          <td>{{dataName}}</td>
-          <td v-for="item in tableData.slice(5, 10)" :key="item[1]">
-            {{item[1]}}
-          </td>
-        </tr>
-
-        <tr>
-          <td>Frequency(GHz)</td>
-          <td v-for="item in tableData.slice(10, 15)" :key="item[0]">
-            {{item[0]}}
-          </td>
-        </tr>
-
-        <tr>
-          <td>{{dataName}}</td>
-          <td v-for="item in tableData.slice(10, 15)" :key="item[1]">
-            {{item[1]}}
-          </td>
-        </tr>
-
-        <tr>
-          <td>Frequency(GHz)</td>
-          <td v-for="item in tableData.slice(15, 20)" :key="item[0]">
-            {{item[0]}}
-          </td>
-        </tr>
-
-        <tr>
-          <td>{{dataName}}</td>
-          <td v-for="item in tableData.slice(15, 20)" :key="item[1]">
+          <td>{{title}} {{dataName}}</td>
+          <td v-for="item in tableData" :key="item[1]">
             {{item[1]}}
           </td>
         </tr>
@@ -74,7 +46,12 @@ export default {
   data () {
     return {
       tableData: [],
-      dataName: 'N/A'
+      dataName: 'N/A',
+      start: 0.1,
+      step: 0.05,
+      end: 3,
+      data: null,
+      title: ''
     }
   },
   methods: {
@@ -89,37 +66,41 @@ export default {
       // parse
       this.parse(fileString)
     },
-    generateTable (data, numPoints, dataName) {
-      // choose 20 data, slice to 5 lines
-      const num = Math.ceil(numPoints / 20)
-      this.tableData = data.reduce((acc, cur, idx) => {
-        if (idx % num === 0) {
+    generateTable () {
+      const start = parseFloat(this.start)
+      const step = parseFloat(this.step)
+      const end = parseFloat(this.end)
+      let k = 0
+      this.tableData = this.data.reduce((acc, cur, idx) => {
+        if (cur[0] >= start + step * k && cur[0] < end + step) {
+          k += 1
           acc.push([cur[0].toFixed(2), cur[1].toFixed(2)])
         }
         return acc
       }, [])
-      this.dataName = dataName
     },
     parse (s) {
       // const lines = this.$refs.data.value.split('\n')
       const lines = s.split('\r\n')
       // get title
-      const title = /参数\s(.*)$/.exec(lines[3])[1]
+      this.title = /参数\s(.*)$/.exec(lines[3])[1]
       const numPoints = parseInt(/扫描点数\s(\d+)$/.exec(lines[7])[1])
-      const dataName = /数据格式\s(.*)$/.exec(lines[8])[1]
-      const data = lines.slice(11, numPoints + 11).map(v => {
+      this.dataName = /数据格式\s(.*)$/.exec(lines[8])[1]
+      this.data = lines.slice(11, numPoints + 11).map(v => {
         const arr = v.split('    ')
-        return [eval(arr[0]) / 1e9, eval(arr[1])]
+        // for VSWR
+        const gamma = 20 ** (parseFloat(arr[1]) / 10)
+        return [parseFloat(arr[0]) / 1e9, (1 + gamma) / (1 - gamma)]
       })
-      this.generateTable(data, numPoints, dataName)
+      this.generateTable()
       const chart = echarts.init(this.$refs.chart)
       chart.setOption({
         title: {
-          text: title
+          text: this.title
         },
         tooltip: {},
         legend: {
-          data: [dataName]
+          data: [this.dataName]
         },
         xAxis: {
           type: 'value',
@@ -146,10 +127,10 @@ export default {
           }
         },
         series: [{
-          name: dataName,
+          name: this.dataName,
           type: 'line',
           showSymbol: false,
-          data
+          data: this.data
         }]
       })
     }
