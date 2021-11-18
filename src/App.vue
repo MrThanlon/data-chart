@@ -88,9 +88,7 @@ export default {
       this.dataName = /数据格式\s(.*)$/.exec(lines[8])[1]
       this.data = lines.slice(11, numPoints + 11).map(v => {
         const arr = v.split('    ')
-        // for VSWR
-        const gamma = 20 ** (parseFloat(arr[1]) / 10)
-        return [parseFloat(arr[0]) / 1e9, (1 + gamma) / (1 - gamma)]
+        return [parseFloat(arr[0]) / 1e9, parseFloat(arr[1])]
       })
       this.generateTable()
       const chart = echarts.init(this.$refs.chart)
